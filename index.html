@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSK Vocabulary Adaptive Test</title>
+    <style>
+        :root {
+            --bg: #F5F2ED;
+            --card: #FFFFFF;
+            --primary: #4A5D4E;
+            --secondary: #A68B67;
+            --text: #333333;
+            --border: #E0DDD5;
+        }
+
+        body {
+            font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        #app {
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        .status-bar {
+            font-size: 12px;
+            letter-spacing: 2px;
+            color: var(--secondary);
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .test-card {
+            background: var(--card);
+            padding: 50px 30px;
+            border-radius: 2px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+            border: 1px solid var(--border);
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+        }
+
+        .target-word {
+            font-size: 3.5rem;
+            font-weight: 500;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .context-sentence {
+            font-size: 1.15rem;
+            line-height: 1.8;
+            color: #666;
+            max-width: 80%;
+            margin: 0 auto;
+            text-wrap: balance;
+        }
+
+        .context-sentence em {
+            font-style: normal;
+            border-bottom: 2px solid var(--secondary);
+            color: var(--text);
+            padding: 0 2px;
+        }
+
+        .options {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            background: none;
+            border: 1px solid var(--border);
+            padding: 14px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: var(--text);
+            border-radius: 4px;
+        }
+
+        button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: #fcfcfc;
+        }
+
+        .hidden { display: none; }
+        #loading { color: var(--secondary); font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="loading">Cargando vocabulario...</div>
+
+    <div id="game-container" class="hidden">
+        <div class="status-bar">
+            Pregunta <span id="current-count">1</span> / 15
+        </div>
+
+        <div class="test-card">
+            <div id="target-word" class="target-word">--</div>
+            <div id="sentence" class="context-sentence">--</div>
+        </div>
+
+        <div class="options">
+            <button onclick="submitAnswer('know')">Lo conozco (认识)</button>
+            <button onclick="submitAnswer('vague')">Me suena (模糊)</button>
+            <button onclick="submitAnswer('none')">No lo conozco (不认识)</button>
+        </div>
+    </div>
+
+    <div id="result-container" class="hidden">
+        <div class="test-card">
+            <div style="font-size: 14px; color: var(--secondary);">TU NIVEL ESTIMADO</div>
+            <div id="final-hsk" style="font-size: 3rem; margin: 20px 0; color: var(--primary);">HSK -</div>
+            <p id="feedback" style="font-size: 0.9rem; color: #888;"></p>
+        </div>
+        <button style="margin-top: 20px; width: 100%;" onclick="location.reload()">Reiniciar Test</button>
+    </div>
+</div>
+
+<script src="hsk_vocab.js"></script>
+
+<script>
+    // 直接引用 hsk_vocab.js 中定义的变量
+    const allData = typeof allVocabData !== 'undefined' ? allVocabData : null;
+    const levels = ["HSK 1-2 (初级)", "HSK 3-4 (中级)", "HSK 5-6 (高级)"];
+    let currentLevelIdx = 1; 
+    let history = [];
+    let qCount = 0;
+    const TOTAL_Q = 15;
+
+    function init() {
+        if (!allData) {
+            document.getElementById('loading').innerText = "Error: No se encontró hsk_vocab.js. Asegúrate de que el archivo existe y tiene el formato correcto.";
+            return;
+        }
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('game-container').classList.remove('hidden');
+        renderNext();
+    }
+
+    function renderNext() {
+        if (qCount >= TOTAL_Q) {
+            showResult();
+            return;
+        }
+
+        qCount++;
+        document.getElementById('current-count').innerText = qCount;
+
+        const currentPool = allData[levels[currentLevelIdx]];
+        const item = currentPool[Math.floor(Math.random() * currentPool.length)];
+
+        document.getElementById('target-word').innerText = item.word;
+        const displaySentence = item.highlighted.replace(/【/g, "<em>").replace(/】/g, "</em>");
+        document.getElementById('sentence').innerHTML = displaySentence;
+    }
+
+    function submitAnswer(type) {
+        history.push(currentLevelIdx);
+
+        if (type === 'know') {
+            if (currentLevelIdx < 2) currentLevelIdx++;
+        } else if (type === 'none') {
+            if (currentLevelIdx > 0) currentLevelIdx--;
+        }
+
+        renderNext();
+    }
+
+    function showResult() {
+        document.getElementById('game-container').classList.add('hidden');
+        document.getElementById('result-container').classList.remove('hidden');
+
+        const lastPicks = history.slice(-5);
+        const avg = lastPicks.reduce((a, b) => a + b, 0) / (lastPicks.length || 1);
+
+        let resultTitle = "";
+        let feedbackText = "";
+
+        if (avg < 0.7) {
+            resultTitle = "HSK 1-2";
+            feedbackText = "Tienes una base sólida de palabras cotidianas. ¡Sigue así!";
+        } else if (avg < 1.5) {
+            resultTitle = "HSK 3-4";
+            feedbackText = "Tu nivel es intermedio. Puedes entender la mayoría de las situaciones sociales.";
+        } else {
+            resultTitle = "HSK 5-6";
+            feedbackText = "Nivel avanzado. Dominas el vocabulario complejo y abstracto.";
+        }
+
+        document.getElementById('final-hsk').innerText = resultTitle;
+        document.getElementById('feedback').innerText = feedbackText;
+    }
+
+    // 执行初始化
+    window.onload = init;
+</script>
+</body>
+</html>
